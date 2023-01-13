@@ -1,5 +1,7 @@
 import os
 import random
+import sys
+import requests
 
 import gradio as gr
 from modules import scripts, script_callbacks
@@ -10,7 +12,6 @@ from modules.paths import script_path
 from webui import wrap_gradio_gpu_call
 import scripts.dream_artist as dream_artist
 import argparse
-
 gvars=argparse.Namespace()
 
 def on_ui_train_tabs(params):
@@ -23,8 +24,26 @@ def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as dream_artist_interface:
         with gr.Row().style(equal_height=False):
             with gr.Tabs(elem_id="da_train_tabs"):
-                with gr.Tab(label="DreamArtist Create embedding"):
+                with gr.Tab(label="Downloader"):
                     new_embedding_name = gr.Textbox(label="Name", interactive=True)
+                    link = "https://civitai-prod.5ac0637cfd0766c97916cefa3764fbdf.r2.cloudflarestorage.com/62780/training-images/hasdx.swbQ.ckpt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=2fea663d76bd24a496545da373d610fc%2F20230113%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20230113T090438Z&X-Amz-Expires=10800&X-Amz-Signature=db72792ac4cc592edbb192a2e72b2f80c4b5d465bcc145044e6ac16a24d25fe5&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B filename%3D%22hasdx_hasedsdx.ckpt%22&x-id=GetObject"
+                    file_name = "/content/gdrive/MyDrive/sd/stable-diffusion-webui/models/Stable-diffusion/modelHasd.ckpt"
+                    with open(file_name, "wb") as f:
+                        new_embedding_name = gr.Textbox(label="Name", interactive=True)
+                        response = requests.get(link, stream=True)
+                        total_length = response.headers.get('content-length')
+                        if total_length is None: # no content length header
+                            f.write(response.content)
+                        else:
+                            dl = 0
+                            total_length = int(total_length)
+                            for data in response.iter_content(chunk_size=4096):
+                                dl += len(data)
+                                f.write(data)
+                                done = int(50 * dl / total_length)
+                                sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )    
+                                sys.stdout.flush()
+
                     initialization_text = gr.Textbox(label="Initialization text", value="*", interactive=True)
                     initialization_text_neg = gr.Textbox(label="Initialization text (negative)", value="*", interactive=True)
                     with gr.Row():
@@ -213,7 +232,7 @@ def on_ui_tabs():
             outputs=[],
         )
 
-    return [(dream_artist_interface, "DreamArtist", "dream_artist")]
+    return [(dream_artist_interface, "Downloader", "downloader_sd")]
 
 
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)
